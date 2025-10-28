@@ -14,3 +14,4 @@ Si su defensa llega a cero, se infecta automáticamente y el sistema actualiza e
  6. Aumentar la defensa de las personas sanas cada tres rondas.
  7. Finalizar la simulación cuando todas las personas estén infectadas o el usuario lo decida.
  8. Esta práctica integra conceptos de programación orientada a objetos, aleatoriedad controlada, estructuras de datos dinámicas y visualización en consola, permitiendo analizar la evolución de una infección de forma clara e interactiva.
+
