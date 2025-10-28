@@ -18,20 +18,21 @@ Si su defensa llega a cero, se infecta automáticamente y el sistema actualiza e
 
 ### Estructura de las clases: 
 
-Clase Persona
+1. Clase Persona
 Representa a cada individuo en la simulación.Contiene su posición, nivel de defensa y estado de infección.Permite moverse por la matriz, infectarse, curarse y modificar su defensa.
-Clase NodoArbol
+2. Clase NodoArbol
 Modela un nodo dentro del árbol de contagio.Cada nodo guarda una persona, su padre (quién la infectó) y sus hijos (a quiénes infectó).
-Clase ArbolContagio
+3.Clase ArbolContagio
 Administra el árbol de propagación de la infección. Registra las relaciones de contagio, permite visualizar el árbol y eliminar nodos al curar personas.
-Clase Matriz
+4. Clase Matriz
 Representa el entorno NxN donde se ubican las personas. Permite moverlas, agregarlas y visualizar su distribución.
-Clase Simulador
+5. Clase Simulador
 Es el núcleo del programa. Controla las rondas, los movimientos, contagios, curaciones y estadísticas. Se apoya en las clases Matriz, ArbolContagio y Persona.
-Clase Visualizador
+6. Clase Visualizador
 Maneja la visualización en consola del estado del sistema. Permite mostrar la matriz, el árbol de contagio, estadísticas y defensas.
- Clase Main
+7. Clase Main
 Controla el flujo principal del programa. Muestra el menú, gestiona el modo de ejecución y lanza la simulación.
+
 
 
 
