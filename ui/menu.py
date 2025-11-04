@@ -1,21 +1,41 @@
 # ui/menu.py
 from __future__ import annotations
 
+# Permite ejecutar este archivo directo:  python ui/menu.py
 if __name__ in {"__main__", "__mp_main__"}:
     import os, sys
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from typing import Optional
+from typing import Optional, Any
 
 from core.simulador import Simulador
+from ui.visualizador import Visualizador
 from models.persona import Persona
 
 
 class MenuPrincipal:
+    """
+    Menú de texto simple para manejar la simulación.
+    Opciones:
+      1) Crear simulador
+      2) Inicializar simulación
+      3) Ejecutar 1 ronda (muestra tabla de vida)
+      4) Ejecutar varias rondas (muestra tabla cada ronda)
+      5) Curar persona (x, y)
+      6) Agregar persona (x, y)
+      7) Ver matriz
+      8) Ver árbol de contagio
+      9) Ver estadísticas
+     10) Infectar manualmente por id (además del inicial)
+     11) Ver tabla de personas (vida/estado)
+      0) Salir
+    """
 
     def __init__(self) -> None:
         self.simulador: Optional[Simulador] = None
+        self.vista: Visualizador = Visualizador()
 
+    # ------------------- BUCLE PRINCIPAL -------------------
     def menu_principal(self) -> None:
         while True:
             self._mostrar_titulo()
@@ -66,10 +86,11 @@ class MenuPrincipal:
                 print("Opción inválida.")
             self._esperar_enter()
 
+    # ------------------- ACCIONES -------------------
     def _crear_simulador(self) -> None:
         try:
             tam = int(input("Tamaño de la matriz (N): ").strip())
-            n   = int(input("Cantidad de personas: ").strip())
+            n = int(input("Cantidad de personas: ").strip())
         except ValueError:
             print("Debes ingresar números enteros.")
             return
@@ -105,7 +126,7 @@ class MenuPrincipal:
             return
         stats = self.simulador.ejecutar_ronda()  # type: ignore[union-attr]
         self._mostrar_stats_compactas(stats)
-        self._mostrar_tabla_personas()  # <-- vida por persona tras la ronda
+        self._mostrar_tabla_personas()
 
     def _ejecutar_varias_rondas(self) -> None:
         if not self._hay_simulador_inicializado():
@@ -117,11 +138,11 @@ class MenuPrincipal:
             return
 
         k = max(0, k)
-        for i in range(k):
+        for _ in range(k):
             stats = self.simulador.ejecutar_ronda()  # type: ignore[union-attr]
             print(f"\n>>> Después de la ronda {stats.get('ronda', '?')}:")
             self._mostrar_stats_compactas(stats)
-            self._mostrar_tabla_personas()  # <-- vida por persona en cada ronda
+            self._mostrar_tabla_personas()
 
     def _curar_persona(self) -> None:
         if not self._hay_simulador_inicializado():
@@ -150,13 +171,9 @@ class MenuPrincipal:
     def _infectar_por_id(self) -> None:
         """
         Infecta manualmente a una persona por su id, además del paciente cero.
-        - Si ya hay infectados, la relaciona en el árbol como contagiada por el primer infectado.
-        - Si no hay infectados aún, la establece como paciente cero.
+        Si no hay infectados aún, la persona indicada se convierte en paciente cero.
         """
-        if not self._hay_simulador():
-            return
-        if not self.simulador.esta_inicializada:  # type: ignore[union-attr]
-            print("Primero inicializa la simulación (opción 2).")
+        if not self._hay_simulador_inicializado():
             return
 
         pid = input("Id de la persona (ej. p3): ").strip()
@@ -170,7 +187,6 @@ class MenuPrincipal:
 
         infectados = self.simulador.get_personas_infectadas()  # type: ignore[union-attr]
         if len(infectados) == 0:
-            # No hay paciente cero: la hacemos paciente cero
             persona.infectar(persona)
             self.simulador.get_arbol().establecer_paciente_cero(persona)  # type: ignore[union-attr]
             print(f"✅ {persona.id} ahora es paciente cero.")
@@ -185,44 +201,29 @@ class MenuPrincipal:
     def _mostrar_matriz(self) -> None:
         if not self._hay_simulador():
             return
-        print("\n--- MATRIZ ---")
-        print(self.simulador.get_matriz().visualizar())
+        self.vista.mostrar_matriz(self.simulador)  # type: ignore[arg-type]
 
     def _mostrar_arbol(self) -> None:
         if not self._hay_simulador():
             return
-        print("\n--- ÁRBOL DE CONTAGIO ---")
-        print(self.simulador.get_arbol().visualizar())
+        self.vista.mostrar_arbol(self.simulador)  # type: ignore[arg-type]
 
     def _mostrar_estadisticas(self) -> None:
         if not self._hay_simulador():
             return
-        stats = self.simulador.get_estadisticas()
+        stats = self.simulador.get_estadisticas()  # type: ignore[union-attr]
         self._mostrar_stats_detalladas(stats)
 
     def _mostrar_tabla_personas(self) -> None:
-        """Imprime una tabla con id, posición, defensa (vida) y estado."""
         if not self._hay_simulador():
             return
-        personas = self.simulador.get_personas()
-        if len(personas) == 0:
-            print("\n(No hay personas)")
-            return
+        self.vista.mostrar_tabla_personas(self.simulador)  # type: ignore[arg-type]
 
-        personas = sorted(personas, key=lambda p: p.id)
-
-        print("\n--- PERSONAS (vida/estado) ---")
-        print(f"{'ID':<5} {'POS':<9} {'DEF':>3}  {'ESTADO'}")
-        print("-" * 28)
-        for p in personas:
-            x, y = p.get_posicion()
-            estado = "INFECTADA" if p.esta_infectada() else "SANA"
-            print(f"{p.id:<5} ({x:>2},{y:>2})  {p.defensa:>3}  {estado}")
-
+    # ------------------- UTILIDADES -------------------
     def _buscar_por_id(self, pid: str) -> Optional[Persona]:
         if not self._hay_simulador():
             return None
-        for p in self.simulador.get_personas():
+        for p in self.simulador.get_personas():  # type: ignore[union-attr]
             if p.id == pid:
                 return p
         return None
@@ -240,13 +241,13 @@ class MenuPrincipal:
         tot = len(self.simulador.get_personas())
         print(f"Estado: simulador creado | ronda={ronda} | personas={tot}")
 
-    def _mostrar_stats_compactas(self, stats: dict) -> None:
+    def _mostrar_stats_compactas(self, stats: dict[str, Any]) -> None:
         print(f"Ronda {stats.get('ronda', '?')}: "
               f"Sanas={stats.get('sanas', '?')}, "
               f"Infectadas={stats.get('infectadas', '?')}, "
               f"Profundidad árbol={stats.get('profundidad_arbol', '?')}")
 
-    def _mostrar_stats_detalladas(self, stats: dict) -> None:
+    def _mostrar_stats_detalladas(self, stats: dict[str, Any]) -> None:
         print("\n--- ESTADÍSTICAS ---")
         for k in ("ronda", "total_personas", "sanas", "infectadas", "profundidad_arbol"):
             print(f"{k}: {stats.get(k)}")
@@ -260,7 +261,7 @@ class MenuPrincipal:
     def _hay_simulador_inicializado(self) -> bool:
         if not self._hay_simulador():
             return False
-        if not self.simulador.esta_inicializada:
+        if not self.simulador.esta_inicializada:  # type: ignore[union-attr]
             print("Primero inicializa la simulación (opción 2).")
             return False
         return True
@@ -274,5 +275,7 @@ class MenuPrincipal:
     def _esperar_enter(self) -> None:
         input("\nPresiona Enter para continuar...")
 
+
+# Permite ejecutar:  python -m ui.menu
 if __name__ == "__main__":
     MenuPrincipal().menu_principal()
