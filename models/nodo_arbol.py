@@ -1,5 +1,7 @@
-from typing import Optional
-from persona import Persona
+from __future__ import annotations
+from typing import Optional, List
+
+from .persona import Persona          
 
 
 class NodoArbol:

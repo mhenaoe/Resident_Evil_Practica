@@ -1,7 +1,8 @@
-from typing import Optional
-from persona import Persona
+from __future__ import annotations
+from typing import List, Tuple, Set
 
-
+from .persona import Persona  
+       
 class Matriz:
     
     def __init__(self, tamano: int) -> None:

@@ -1,8 +1,8 @@
-from typing import Optional
+from __future__ import annotations
+from typing import Optional, List
 
-
-from persona import Persona
-from nodo_arbol import NodoArbol
+from .nodo_arbol import NodoArbol     
+from .persona import Persona          
 
 
 class ArbolContagio:

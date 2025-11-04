@@ -1,20 +1,14 @@
+from __future__ import annotations  
+
 import random
-from typing import Optional
+from typing import Optional, Any
 
-try:
-    from models.persona import Persona
-    from models.matriz import Matriz
-    from models.arbol_contagio import ArbolContagio
-except ModuleNotFoundError:
-    import sys
-    from pathlib import Path
+from models.persona import Persona
+from models.nodo_arbol import NodoArbol
+from models.matriz import Matriz
+from models.arbol_contagio import ArbolContagio
 
-    sys.path.append(str(Path(__file__).parent.parent))
-    from models.persona import Persona
-    from models.matriz import Matriz
-    from models.arbol_contagio import ArbolContagio
-
-
+    
 class Simulador:
 
     def __init__(self, tamano_matriz: int, cantidad_personas: int,
@@ -45,7 +39,7 @@ class Simulador:
         self._seleccionar_paciente_cero()
         self.esta_inicializada = True
 
-    def ejecutar_ronda(self) -> dict[str, any]:
+    def ejecutar_ronda(self) -> dict[str, Any]:
         if not self.esta_inicializada:
             return {}
 
@@ -173,7 +167,7 @@ class Simulador:
                 return False
         return True
 
-    def get_estadisticas(self) -> dict[str, any]:
+    def get_estadisticas(self) -> dict[str, Any]:
         cantidad_total = len(self.lista_personas)
         cantidad_infectadas = len(self.arbol.get_infectados())
         cantidad_sanas = cantidad_total - cantidad_infectadas
