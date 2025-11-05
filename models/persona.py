@@ -45,5 +45,3 @@ class Persona:
         if not isinstance(other, Persona):
             return False
         return self.id == other.id
-
-

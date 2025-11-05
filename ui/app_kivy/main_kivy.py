@@ -39,10 +39,6 @@ from ui.app_kivy.tree import open_tree_dialog
 
 
 # --- utilidades UI ---
-def make_divider() -> Widget:
-    return Widget(size_hint_y=None, height=dp(8))
-
-
 def make_hint(text: str) -> MDLabel:
     return MDLabel(
         text=text,
@@ -99,8 +95,10 @@ class SimulationController:
             self._event = None
 
     def set_speed(self, rps: float) -> None:
+        """Actualiza la velocidad y reinicia el scheduler si está corriendo."""
         self.rounds_per_sec = max(0.1, rps)
         if self._event is not None:
+            # reprogramar con el nuevo intervalo
             self.play()
 
     # API para la UI
@@ -123,13 +121,12 @@ class SimulationController:
         return self.sim.get_arbol().visualizar() if self.sim else "(sin árbol)"
 
     def curar_at(self, x: int, y: int) -> bool:
-        return self.sim.curar_persona(x, y) if self.sim else False
+        return self.sim.curar_persona(persona_x := x, persona_y := y) if self.sim else False  # noqa
 
     def agregar_at(self, x: int, y: int) -> bool:
         return self.sim.agregar_persona(x, y) if self.sim else False
 
     def infectar_en_celda(self, x: int, y: int) -> bool:
-        """Infecta una persona sana en (x,y). Si no hay infectados aún, crea paciente cero."""
         if not self.sim:
             return False
         personas = self.sim.get_matriz().obtener_personas_en(x, y)
@@ -161,7 +158,7 @@ class ControlPanel(MDCard):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.padding = dp(12)
-        self.size_hint_x = 0.34
+        self.size_hint_x = 0.36
         self.radius = dp(16)
         self.md_bg_color = (18/255, 18/255, 18/255, 1)
 
@@ -174,9 +171,10 @@ class ControlPanel(MDCard):
         self.sw_multi = MDSwitch(active=False)
         row_multi = MDBoxLayout(orientation="horizontal", spacing=dp(8), size_hint_y=None, height=dp(34))
         row_multi.add_widget(self.sw_multi)
-        row_multi.add_widget(MDLabel(text="Daño múltiple\n(−1 por infectado presente)", halign="left"))
+        row_multi.add_widget(MDLabel(text="Daño múltiple (−1 por infectado en la celda)", halign="left"))
 
-        params_box = MDBoxLayout(orientation="vertical", spacing=dp(8), padding=(dp(8), 0, dp(8), dp(8)), adaptive_height=True)
+        params_box = MDBoxLayout(orientation="vertical", spacing=dp(10),
+                                 padding=(dp(8), 0, dp(8), dp(8)), adaptive_height=True)
         params_box.add_widget(make_hint("Configura y crea una nueva simulación."))
         params_box.add_widget(self.txt_n)
         params_box.add_widget(self.txt_p)
@@ -188,7 +186,8 @@ class ControlPanel(MDCard):
         params_box.add_widget(self.btn_new)
 
         # CONTROLES
-        controls_box = MDBoxLayout(orientation="vertical", spacing=dp(8), padding=(dp(8), 0, dp(8), dp(8)), adaptive_height=True)
+        controls_box = MDBoxLayout(orientation="vertical", spacing=dp(10),
+                                   padding=(dp(8), 0, dp(8), dp(8)), adaptive_height=True)
         controls_box.add_widget(make_hint("Ejecuta la simulación y ajusta la velocidad."))
         toolbar = MDBoxLayout(orientation="horizontal", spacing=dp(8), size_hint_y=None, height=dp(44))
         self.btn_play = MDIconButton(icon="play", on_release=lambda *_: self._on_play())
@@ -196,48 +195,62 @@ class ControlPanel(MDCard):
         self.btn_step = MDIconButton(icon="skip-next", on_release=lambda *_: self._on_step())
         toolbar.add_widget(self.btn_play); toolbar.add_widget(self.btn_pause); toolbar.add_widget(self.btn_step)
         controls_box.add_widget(toolbar)
-        self.lbl_speed = MDLabel(text="Velocidad (rondas/seg):", halign="left", size_hint_y=None, height=dp(18))
-        self.slider_speed = MDSlider(min=0.5, max=20, value=2, step=0.5)
-        self.slider_speed.bind(value=lambda _s, val: self._on_speed(val))
-        controls_box.add_widget(self.lbl_speed)
-        controls_box.add_widget(self.slider_speed)
+
+        # fila de velocidad: −  [ Velocidad: 1.5 r/s ]  slider  +
+        row_speed = MDBoxLayout(orientation="horizontal", spacing=dp(8),
+                                size_hint_y=None, height=dp(42))
+        self.btn_minus = MDIconButton(icon="minus", on_release=lambda *_: self._bump_speed(-0.5))
+        self.lbl_speed = MDLabel(text="Velocidad: 2.0 r/s",
+                                 halign="center", size_hint_x=None, width=dp(160))
+        self.slider_speed = MDSlider(min=0.5, max=20, value=2.0, step=0.5)
+        self.slider_speed.bind(value=self._on_speed_change)
+        self.btn_plus = MDIconButton(icon="plus", on_release=lambda *_: self._bump_speed(+0.5))
+        row_speed.add_widget(self.btn_minus)
+        row_speed.add_widget(self.lbl_speed)
+        row_speed.add_widget(self.slider_speed)
+        row_speed.add_widget(self.btn_plus)
+        controls_box.add_widget(row_speed)
 
         # INDICADORES
         self.kpis = KPIsWidget()
         self.kpis.size_hint_y = None
-        self.kpis.height = dp(240)  # más alto para evitar solapes
-        indicadores_box = MDBoxLayout(orientation="vertical", spacing=dp(6), padding=(dp(8), 0, dp(8), dp(8)), adaptive_height=True)
+        self.kpis.height = dp(260)  # más alto para evitar solapes
+        indicadores_box = MDBoxLayout(orientation="vertical", spacing=dp(6),
+                                      padding=(dp(8), 0, dp(8), dp(8)), adaptive_height=True)
         indicadores_box.add_widget(make_hint("Resumen de la ronda actual y evolución."))
         indicadores_box.add_widget(self.kpis)
 
         # HERRAMIENTAS
-        tools_box = MDBoxLayout(orientation="vertical", spacing=dp(8), padding=(dp(8), 0, dp(8), dp(8)), adaptive_height=True)
+        tools_box = MDBoxLayout(orientation="vertical", spacing=dp(10),
+                                padding=(dp(8), 0, dp(8), dp(8)), adaptive_height=True)
         tools_box.add_widget(make_hint("Acciones rápidas sobre el tablero y visualizaciones."))
 
-        row_tools_1 = MDBoxLayout(orientation="horizontal", spacing=dp(8), size_hint_y=None, height=dp(40))
+        row_tools_1 = MDBoxLayout(orientation="horizontal", spacing=dp(8),
+                                  size_hint_y=None, height=dp(40))
         row_tools_1.add_widget(MDFillRoundFlatIconButton(text="Ver árbol", icon="source-branch",
                                on_release=lambda *_: self._show_tree()))
         row_tools_1.add_widget(MDFillRoundFlatIconButton(text="Tabla de salud", icon="table",
                                on_release=lambda *_: self._open_health_table()))
         tools_box.add_widget(row_tools_1)
 
-        row_tools_2 = MDBoxLayout(orientation="horizontal", spacing=dp(8), size_hint_y=None, height=dp(40))
+        row_tools_2 = MDBoxLayout(orientation="horizontal", spacing=dp(8),
+                                  size_hint_y=None, height=dp(40))
         row_tools_2.add_widget(MDFillRoundFlatIconButton(text="Infectar celda", icon="virus",
                                on_release=lambda *_: self._mode('infect')))
         row_tools_2.add_widget(MDFillRoundFlatIconButton(text="Curar celda", icon="account-heart",
                                on_release=lambda *_: self._mode('cure')))
         tools_box.add_widget(row_tools_2)
 
-        row_tools_3 = MDBoxLayout(orientation="horizontal", spacing=dp(8), size_hint_y=None, height=dp(40))
+        row_tools_3 = MDBoxLayout(orientation="horizontal", spacing=dp(8),
+                                  size_hint_y=None, height=dp(40))
         row_tools_3.add_widget(MDFillRoundFlatIconButton(text="Agregar persona", icon="account-plus",
                                on_release=lambda *_: self._mode('add')))
         row_tools_3.add_widget(MDFillRoundFlatIconButton(text="Capturar tablero", icon="camera",
                                on_release=lambda *_: self._snapshot_board()))
         tools_box.add_widget(row_tools_3)
 
-        # ---------- creación de los panels desplegables ----------
-        self.root_stack = MDBoxLayout(orientation="vertical", spacing=dp(10))
-
+        # ---------- panels desplegables ----------
+        self.root_stack = MDBoxLayout(orientation="vertical", spacing=dp(12))
         self.root_stack.add_widget(MDExpansionPanel(
             icon="tune",
             panel_cls=MDExpansionPanelOneLine(text="Parámetros (configurar nueva simulación)"),
@@ -245,7 +258,7 @@ class ControlPanel(MDCard):
         ))
         self.root_stack.add_widget(MDExpansionPanel(
             icon="controller-classic",
-            panel_cls=MDExpansionPanelOneLine(text="Controles (play / pause / paso / velocidad)"),
+            panel_cls=MDExpansionPanelOneLine(text="Controles (play / pausa / paso / velocidad)"),
             content=controls_box,
         ))
         self.root_stack.add_widget(MDExpansionPanel(
@@ -261,6 +274,19 @@ class ControlPanel(MDCard):
 
         self.add_widget(self.root_stack)
 
+    # ------- helpers velocidad -------
+    def _on_speed_change(self, _slider, value: float) -> None:
+        # actualiza la etiqueta y la velocidad del motor
+        v = float(value)
+        self.lbl_speed.text = f"Velocidad: {v:.1f} r/s"
+        self.controller.set_speed(v)
+
+    def _bump_speed(self, delta: float) -> None:
+        v = self.slider_speed.value + delta
+        v = max(self.slider_speed.min, min(self.slider_speed.max, v))
+        # asignar al slider dispara _on_speed_change
+        self.slider_speed.value = v
+
     # ------- acciones de herramientas -------
     def _show_tree(self) -> None:
         txt = self.controller.tree_text() if self.controller.sim else "(sin árbol)"
@@ -271,19 +297,16 @@ class ControlPanel(MDCard):
             MDDialog(title="Aviso", text="Crea una simulación primero.").open()
             return
 
-        # Datos
         rows = []
         for d in self.controller.persons_snapshot():
             estado = "INFECTADA" if d["infected"] else "SANA"
             rows.append((d["id"], str(d["defensa"]), estado, str(d["x"]), str(d["y"])))
 
-        # Contenedor con altura explícita para que el Dialog mida bien
         wrapper = MDBoxLayout(orientation="vertical", size_hint=(0.95, None),
                               height=dp(420), padding=(dp(6), 0, dp(6), dp(6)))
         scroll = MDScrollView(size_hint=(1, 1))
         wrapper.add_widget(scroll)
 
-        # Grilla scrollable
         grid = GridLayout(cols=5, size_hint_y=None, size_hint_x=1, padding=dp(8), spacing=dp(10))
         grid.bind(minimum_height=grid.setter("height"))
 
@@ -363,9 +386,6 @@ class ControlPanel(MDCard):
         self.board.update_people(self.controller.persons_snapshot())
         self.kpis.update_stats(stats)
 
-    def _on_speed(self, value: float) -> None:
-        self.controller.set_speed(float(value))
-
 
 # ==================== LAYOUT RAÍZ ====================
 class RootLayout(MDBoxLayout):
@@ -387,7 +407,7 @@ class RootLayout(MDBoxLayout):
         # Cuerpo: tablero + panel
         body = MDBoxLayout(orientation="horizontal", spacing=dp(8), padding=dp(8))
         self.board = BoardWidget(on_cell_action=self._on_board_action)
-        self.board.size_hint_x = 0.66
+        self.board.size_hint_x = 0.64
 
         self.panel = ControlPanel()
         self.panel.controller = self.controller
@@ -458,6 +478,7 @@ class RootLayout(MDBoxLayout):
                 self._toast("Play")
             return True
         if key == 262:
+            # Flecha derecha
             self.panel._on_step()
             return True
         return False
